@@ -51,7 +51,6 @@ def create_points_cutted_matrix(items, board_height, board_width):
                     w += 1
                 r += 1
             l += 1
-    
     return A
 
 
@@ -70,13 +69,12 @@ def run(argv):
     instance_data, items_ids_mapping = read(input_file)
 
 
-    # print(instance_data["items"])
     A = create_points_cutted_matrix(
         instance_data["items"], 
         instance_data["height"], 
         instance_data["width"]
     )
-    # print(A)
+
     model = create_model(
         instance_data["items"],
         instance_data["height"],
@@ -109,15 +107,11 @@ def run(argv):
         for var in model.getVars():
             if ("x" in var.VarName):
                 i, j, l, w = var.VarName.split("_")[1:]
-                # print(i, j, l, w, k, var.x)
                 if (int(j) == k and var.x > 0.5):
                     x[int(i)] = int(l)
                     y[int(i)] = int(w)
-                    items_to_draw[i] = instance_data["items"][int(i)]
+                    items_to_draw[int(i)] = instance_data["items"][int(i)]
         
-        # print(x)
-        # print(y)
-        # print(items_to_draw)
         draw_solution(
             items_to_draw,
             items_ids_mapping,
@@ -126,12 +120,12 @@ def run(argv):
             instance_data["width"], 
             instance_data["height"],
             output_directory,
-            k+1
+            k
         )
 
-    for var in model.getVars():
-        if (var.x > 0.5):
-            print(var)
+    # for var in model.getVars():
+    #     if (var.x > 0.5):
+    #         print(var)
 
     # example to use later
     # board_1 = [instance_data["items"][0], instance_data["items"][1]]

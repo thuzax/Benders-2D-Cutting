@@ -23,8 +23,8 @@ def create_x_vars(model, items, board_height, board_width, number_of_boards):
     x_vars = {}
     for i in range(1, len(items)+1):
         for j in range(1, number_of_boards+1):
-            for l in range(board_width - items[i]["width"]):
-                for w in range(board_height - items[i]["height"]):
+            for l in range(board_width - items[i]["width"] + 1):
+                for w in range(board_height - items[i]["height"] + 1):
                     var_name = (
                         "x_" 
                         + str(items[i]["id"]) + "_" 
@@ -32,7 +32,6 @@ def create_x_vars(model, items, board_height, board_width, number_of_boards):
                         + str(l) + "_" 
                         + str(w)
                     )
-                    
                     x_vars_names[i,j,l,w] = var_name
                     x_vars[i,j,l,w] = model.addVar(
                         name=var_name,
@@ -52,6 +51,7 @@ def create_y_vars(model, number_of_boards):
         y_vars[j] = model.addVar(name=var_name, vtype=GRB.BINARY)
     return (y_vars_names, y_vars)
 
+
 def create_overlapping_constr(
     model, 
     items,
@@ -63,36 +63,42 @@ def create_overlapping_constr(
     y_vars_names,
     A
 ):
-    overlapping_constrs = []
+    overlapping_constrs = {}
+    
+    keys = [
+        x_var_name.split("_")[1:] 
+        for x_var_name in x_vars_names.values()
+    ]
+
+    for k in range(len(keys)):
+        keys[k][0] = int(keys[k][0])
+        keys[k][1] = int(keys[k][1])
+        keys[k][2] = int(keys[k][2])
+        keys[k][3] = int(keys[k][3])
+        keys[k] = tuple(keys[k])
+
     for j in range(1, len(y_vars)+1):
         for r in range(board_width):
             for s in range(board_height):
-                A_keys = []
-                x_keys = []
-                items_to_constr = []
-                for key in x_vars_names.keys():
-                    i, c, l, w = key
-                    A_key = (i, l, w, r, s)
-                    x_key = (i, c, l, w)                    
-                    if (A_key in A):
-                        items_to_constr.append(x_vars[x_key])
-                        print(A_key, x_key, x_vars_names[x_key])
-
-                if (len(items_to_constr) > 0):
-                    overlapping_constrs.append(model.addConstr(
-                        quicksum(
-                            item
-                            for item in items_to_constr
-                        )
-                        <=
-                        y_vars[j],
+                vars_constr = []
+                for k in range(len(keys)):
+                    i, c, l, w = keys[k]
+                    if (j == c and (i, l, w, r, s) in A):
+                        # constr_hash[j, r, s].append(x_vars[i, j, l, w])
+                        vars_constr.append(x_vars[i, j, l, w])
+                
+                if (len(vars_constr) > 0):
+                    model.addConstr(
+                        quicksum(vars_constr) <= y_vars[j],
                         name=(
-                            "overlapping_" 
+                            "overlapping_constr_" 
                             + str(j) + "_" 
                             + str(r) + "_" 
                             + str(s)
                         )
-                    ))
+                    )
+
+
 
     return overlapping_constrs
 
@@ -171,6 +177,6 @@ def create_model(
     )
 
 
-    print_model(model)
+    # print_model(model)
     # print(A)
     return model

@@ -21,13 +21,20 @@ def draw_solution(
 
     if (not os.path.exists(figures_path)):
         os.mkdir(figures_path)
-
-
+    
     if (len(x) > 0):
-
         plt.clf()
 
-        for i in range(1, len(items)+1):
+        plt.axis('equal')
+
+        figure, ax = plt.subplots()
+        figure.set_figwidth(max_width)
+        figure.set_figheight(max_height)
+        ax.grid(True)
+        ax.set_xticks(range(max_width+1))
+        ax.set_yticks(range(max_height+1))
+
+        for i in items.keys():
             item_id = items[i]["id"]
             
             axis_x = [
@@ -42,7 +49,7 @@ def draw_solution(
 
             axis_x = numpy.array(axis_x)
             axis_y = numpy.array(axis_y)
-            
+
             plt.xlim(0, max_width)
             plt.ylim(0, max_height)
 
@@ -57,11 +64,13 @@ def draw_solution(
                 color='black'
             )
 
+        
         file_path = os.path.join(
             figures_path,
             str(board_id) + ".png"
         )
 
         plt.savefig(file_path)
+        plt.close()
     
     return
