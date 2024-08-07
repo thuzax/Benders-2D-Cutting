@@ -1,8 +1,70 @@
 import os
 import sys
-from model_manager import *
+import numpy
+from original_model import *
 from input_manager import read
 from output_manager import draw_solution
+
+def verify_cut_on_X(l, r, item, board_width):
+    '''
+    if 0 <= l <= r <= l + item width - 1 <= board width, then r is within the horizontal cut range
+    '''
+    if (
+        (l <= r) 
+        and (r <= l + item["width"] - 1)
+        and (l + item["width"] - 1 <= board_width - 1)
+    ):
+        return 1
+    return 0
+
+def verify_cut_on_Y(w, s, item, board_height):
+    '''
+    if 0 <= w <= s <= w + item height - 1 <= board height, then s is within the vertical cut range
+    '''
+    if (
+        (w <= s) 
+        and (w <= w + item["height"] - 1)
+        and (w + item["height"] - 1 <= board_height - 1)
+    ):
+        return 1
+    return 0
+
+
+
+def create_points_cutted_matrix(items, board_height, board_width):
+    A = dict()
+    
+    for i in range(len(items)):
+        item = items[i]
+        l = 0
+        while (l < board_width):
+            width = item["width"]
+            if (l + width - 1 > board_width - 1):
+                l = board_width
+                continue
+            r = l
+            while (r < board_width):
+                if (l > r or r > l + width - 1):
+                    r = board_width
+                    continue
+                w = 0
+                while (w < board_height):
+                    height = item["height"]
+                    if (w + height - 1 > board_height - 1):
+                        w = board_height
+                        continue
+                    s = w
+                    while (s < board_height):
+                        if (w > s and (w + height - 1 > board_height - 1)):
+                            s = board_height
+                            continue
+                        A[item["id"],l,w,r,s] = True
+                        s += 1
+                    w += 1
+                r += 1
+            l += 1
+    
+    return A
 
 
 def run(argv):
@@ -17,42 +79,81 @@ def run(argv):
     if (not os.path.exists(output_directory)):
         os.mkdir(output_directory)
 
-    instance_data, items_ids_mapping = read(argv[1])
+    instance_data, items_ids_mapping = read(input_file)
 
-    board_1 = [instance_data["items"][0], instance_data["items"][2]]
-    board_2 = [instance_data["items"][1], instance_data["items"][3]]
-    board_3 = [instance_data["items"][4]]
 
-    draw_solution(
-        board_1, 
-        items_ids_mapping, 
-        {1: 0, 3: 20}, 
-        {1: 0, 3: 0}, 
-        instance_data["width"], instance_data["height"],
-        output_directory,
-        1
+    A = create_points_cutted_matrix(
+        instance_data["items"], 
+        instance_data["height"], 
+        instance_data["width"]
     )
 
-    draw_solution(
-        board_2, 
-        items_ids_mapping, 
-        {2: 0, 4: 0}, 
-        {2: 0, 4: 30}, 
-        instance_data["width"], instance_data["height"],
-        output_directory,
-        2
+    model = create_model(
+        instance_data["items"],
+        instance_data["height"],
+        instance_data["width"], 
+        A,
+        instance_data["number_of_items"],
+        "2D-BPP"
     )
 
-    draw_solution(
-        board_3, 
-        items_ids_mapping, 
-        {5: 0}, 
-        {5: 0}, 
-        instance_data["width"], instance_data["height"],
-        output_directory,
-        3
-    )
+    model.optimize()
 
+
+    board = {}
+    board_ids = []
+
+    for var in model.getVars():
+        if ("y" in var.VarName):
+            if (var.x > 0.5):
+                board_ids.append(int(var.VarName.split("_")[1]))
+
+    last_board_id = max(board_ids)
+    
+    for k in range(last_board_id):
+        x = {}
+        y = {}
+        items_to_draw = []
+        for var in model.getVars():
+            if ("x" in var.VarName):
+                i, j, l, w = var.VarName.split("_")[1:]
+                print(i, j, l, w, k, var.x)
+                if (int(j) == k and var.x > 0.5):
+                    x[int(i)] = int(l)
+                    y[int(i)] = int(w)
+                    items_to_draw.append(instance_data["items"][int(i)-1])
+        
+        print(x)
+        print(y)
+        print(items_to_draw)
+        draw_solution(
+            items_to_draw,
+            items_ids_mapping,
+            x,
+            y,
+            instance_data["width"], 
+            instance_data["height"],
+            output_directory,
+            k+1
+        )
+
+    for var in model.getVars():
+        if (var.x > 0.5):
+            print(var)
+
+    # example to use later
+    # board_1 = [instance_data["items"][0], instance_data["items"][1]]
+    # draw_solution(
+    #     board_1, 
+    #     items_ids_mapping, 
+    #     {1: 0, 3: 20}, 
+    #     {1: 0, 3: 0}, 
+    #     instance_data["width"], instance_data["height"],
+    #     output_directory,
+    #     1
+    # )
+
+    
 if __name__ == "__main__":
     run(sys.argv)
 
