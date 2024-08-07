@@ -38,7 +38,7 @@ def read(file_name):
         instance_data["width"] = int(line.split()[0].strip())
         instance_data["height"] = int(line.split()[1].strip())
     
-        instance_data["items"] = []
+        instance_data["items"] = {}
         fake_id = 1
         
         for i in range(instance_data["number_of_items"]):
@@ -58,10 +58,9 @@ def read(file_name):
             demand = int(line[3].strip())
 
             for j in range(demand):
-                
                 items_id_mapping[fake_id] = true_id
                 data["id"] = fake_id
+                instance_data["items"][fake_id] = copy.deepcopy(data)
                 fake_id += 1
-                instance_data["items"].append(copy.deepcopy(data))
 
     return (instance_data, items_id_mapping)

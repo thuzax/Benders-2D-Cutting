@@ -34,30 +34,18 @@ def verify_cut_on_Y(w, s, item, board_height):
 def create_points_cutted_matrix(items, board_height, board_width):
     A = dict()
     
-    for i in range(len(items)):
+    for i in range(1, len(items)+1):
         item = items[i]
         l = 0
-        while (l < board_width):
-            width = item["width"]
-            if (l + width - 1 > board_width - 1):
-                l = board_width
-                continue
+        width = item["width"]
+        height = item["height"]
+        while (l + width - 1 <= board_width - 1):
             r = l
-            while (r < board_width):
-                if (l > r or r > l + width - 1):
-                    r = board_width
-                    continue
+            while (r <= l + width - 1):
                 w = 0
-                while (w < board_height):
-                    height = item["height"]
-                    if (w + height - 1 > board_height - 1):
-                        w = board_height
-                        continue
+                while (w + height - 1 <= board_height - 1):
                     s = w
-                    while (s < board_height):
-                        if (w > s and (w + height - 1 > board_height - 1)):
-                            s = board_height
-                            continue
+                    while (s <= w + height - 1):
                         A[item["id"],l,w,r,s] = True
                         s += 1
                     w += 1
@@ -82,12 +70,13 @@ def run(argv):
     instance_data, items_ids_mapping = read(input_file)
 
 
+    # print(instance_data["items"])
     A = create_points_cutted_matrix(
         instance_data["items"], 
         instance_data["height"], 
         instance_data["width"]
     )
-
+    # print(A)
     model = create_model(
         instance_data["items"],
         instance_data["height"],
@@ -96,9 +85,12 @@ def run(argv):
         instance_data["number_of_items"],
         "2D-BPP"
     )
-
+    
+    print("======================")
     model.optimize()
-
+    # model.computeIIS()
+    # print_iis(model)
+    print("======================")
 
     board = {}
     board_ids = []
@@ -110,22 +102,22 @@ def run(argv):
 
     last_board_id = max(board_ids)
     
-    for k in range(last_board_id):
+    for k in range(1, last_board_id+1):
         x = {}
         y = {}
-        items_to_draw = []
+        items_to_draw = {}
         for var in model.getVars():
             if ("x" in var.VarName):
                 i, j, l, w = var.VarName.split("_")[1:]
-                print(i, j, l, w, k, var.x)
+                # print(i, j, l, w, k, var.x)
                 if (int(j) == k and var.x > 0.5):
                     x[int(i)] = int(l)
                     y[int(i)] = int(w)
-                    items_to_draw.append(instance_data["items"][int(i)-1])
+                    items_to_draw[i] = instance_data["items"][int(i)]
         
-        print(x)
-        print(y)
-        print(items_to_draw)
+        # print(x)
+        # print(y)
+        # print(items_to_draw)
         draw_solution(
             items_to_draw,
             items_ids_mapping,

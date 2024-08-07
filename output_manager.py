@@ -27,7 +27,7 @@ def draw_solution(
 
         plt.clf()
 
-        for i in range(len(items)):
+        for i in range(1, len(items)+1):
             item_id = items[i]["id"]
             
             axis_x = [
