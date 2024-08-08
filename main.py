@@ -5,34 +5,9 @@ from original_model import *
 from input_manager import read
 from output_manager import draw_solution
 
-def verify_cut_on_X(l, r, item, board_width):
-    '''
-    if 0 <= l <= r <= l + item width - 1 <= board width, then r is within the horizontal cut range
-    '''
-    if (
-        (l <= r) 
-        and (r <= l + item["width"] - 1)
-        and (l + item["width"] - 1 <= board_width - 1)
-    ):
-        return 1
-    return 0
-
-def verify_cut_on_Y(w, s, item, board_height):
-    '''
-    if 0 <= w <= s <= w + item height - 1 <= board height, then s is within the vertical cut range
-    '''
-    if (
-        (w <= s) 
-        and (w <= w + item["height"] - 1)
-        and (w + item["height"] - 1 <= board_height - 1)
-    ):
-        return 1
-    return 0
-
-
 
 def create_points_cutted_matrix(items, board_height, board_width):
-    A = dict()
+    A = set()
     
     for i in range(1, len(items)+1):
         item = items[i]
@@ -46,7 +21,7 @@ def create_points_cutted_matrix(items, board_height, board_width):
                 while (w + height - 1 <= board_height - 1):
                     s = w
                     while (s <= w + height - 1):
-                        A[item["id"],l,w,r,s] = True
+                        A.add((item["id"],l,w,r,s))
                         s += 1
                     w += 1
                 r += 1
@@ -75,12 +50,14 @@ def run(argv):
         instance_data["width"]
     )
 
-    model = create_model(
+    number_of_boards = instance_data["number_of_items"]
+
+    model = create_original_model(
         instance_data["items"],
         instance_data["height"],
         instance_data["width"], 
         A,
-        instance_data["number_of_items"],
+        number_of_boards,
         "2D-BPP"
     )
     
@@ -126,18 +103,6 @@ def run(argv):
     # for var in model.getVars():
     #     if (var.x > 0.5):
     #         print(var)
-
-    # example to use later
-    # board_1 = [instance_data["items"][0], instance_data["items"][1]]
-    # draw_solution(
-    #     board_1, 
-    #     items_ids_mapping, 
-    #     {1: 0, 3: 20}, 
-    #     {1: 0, 3: 0}, 
-    #     instance_data["width"], instance_data["height"],
-    #     output_directory,
-    #     1
-    # )
 
     
 if __name__ == "__main__":

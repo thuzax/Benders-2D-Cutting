@@ -17,29 +17,62 @@ def print_iis(model):
         print(text)
         os.remove("iismodel.ilp")
 
+def create_x_j_vars(model, items, board_height, board_width, j):
+    x_vars_names = {}
+    x_vars_keys = {}
+    x_of_board_vars_key = []
+    x_vars = {}
+    for i in items.keys():
+        for l in range(board_width - items[i]["width"] + 1):
+            for w in range(board_height - items[i]["height"] + 1):
+                var_name = (
+                    "x_" 
+                    + str(items[i]["id"]) + "_" 
+                    + str(j) + "_" 
+                    + str(l) + "_" 
+                    + str(w)
+                )
+                x_of_board_vars_key.append((i, j, l, w))
+                x_vars_keys[i,j,l,w] = (i,j,l,w)
+                x_vars_names[i,j,l,w] = var_name
+                x_vars[i,j,l,w] = model.addVar(
+                    name=var_name,
+                    vtype=GRB.BINARY
+                )
+
+    return (x_vars_names, x_vars_keys, x_of_board_vars_key, x_vars)
 
 def create_x_vars(model, items, board_height, board_width, number_of_boards):
     x_vars_names = {}
+    x_vars_keys = {}
+    x_of_board_vars_keys = {}
     x_vars = {}
-    for i in range(1, len(items)+1):
-        for j in range(1, number_of_boards+1):
-            for l in range(board_width - items[i]["width"] + 1):
-                for w in range(board_height - items[i]["height"] + 1):
-                    var_name = (
-                        "x_" 
-                        + str(items[i]["id"]) + "_" 
-                        + str(j) + "_" 
-                        + str(l) + "_" 
-                        + str(w)
-                    )
-                    x_vars_names[i,j,l,w] = var_name
-                    x_vars[i,j,l,w] = model.addVar(
-                        name=var_name,
-                        vtype=GRB.BINARY
-                    )
-                    
-                
-    return (x_vars_names, x_vars)
+    for j in range(1, number_of_boards+1):
+        vars_data = create_x_j_vars(model, items, board_height, board_width, j)
+        x_vars_names |= vars_data[0]
+        x_vars_keys |= vars_data[1]
+        x_of_board_vars_keys[j] = vars_data[2]
+        x_vars |= vars_data[3]
+        # x_of_board_vars_keys[j] = []
+        # for i in items.keys():
+        #     for l in range(board_width - items[i]["width"] + 1):
+        #         for w in range(board_height - items[i]["height"] + 1):
+        #             var_name = (
+        #                 "x_" 
+        #                 + str(items[i]["id"]) + "_" 
+        #                 + str(j) + "_" 
+        #                 + str(l) + "_" 
+        #                 + str(w)
+        #             )
+        #             x_of_board_vars_keys[j].append((i, j, l, w))
+        #             x_vars_keys[i,j,l,w] = (i,j,l,w)
+        #             x_vars_names[i,j,l,w] = var_name
+        #             x_vars[i,j,l,w] = model.addVar(
+        #                 name=var_name,
+        #                 vtype=GRB.BINARY
+        #             )
+
+    return (x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars)
 
 
 def create_y_vars(model, number_of_boards):
@@ -52,53 +85,79 @@ def create_y_vars(model, number_of_boards):
     return (y_vars_names, y_vars)
 
 
+def create_board_overlapping_constr(
+    model, 
+    board_width,
+    board_height,
+    j,
+    keys,
+    x_vars,
+    y,
+    A
+):
+    constr = {}
+    for r in range(board_width):
+        for s in range(board_height):
+            vars_constr = []
+            for k in keys:
+                i, c, l, w = k
+                if ((i, l, w, r, s) in A):
+                    vars_constr.append(x_vars[i, j, l, w])
+            if (len(vars_constr) > 0):
+                constr[j,r,s] = model.addConstr(
+                    quicksum(vars_constr) <= y,
+                    name=(
+                        "overlapping_constr_" 
+                        + str(j) + "_" 
+                        + str(r) + "_" 
+                        + str(s)
+                    )
+                )
+    return constr
+
+
 def create_overlapping_constr(
     model, 
-    items,
     board_width,
     board_height,
     x_vars,
-    x_vars_names,
+    x_of_board_vars_keys,
     y_vars,
-    y_vars_names,
     A
 ):
     overlapping_constrs = {}
     
-    keys = [
-        x_var_name.split("_")[1:] 
-        for x_var_name in x_vars_names.values()
-    ]
+    # keys = x_vars_keys
 
-    for k in range(len(keys)):
-        keys[k][0] = int(keys[k][0])
-        keys[k][1] = int(keys[k][1])
-        keys[k][2] = int(keys[k][2])
-        keys[k][3] = int(keys[k][3])
-        keys[k] = tuple(keys[k])
-
-    for j in range(1, len(y_vars)+1):
-        for r in range(board_width):
-            for s in range(board_height):
-                vars_constr = []
-                for k in range(len(keys)):
-                    i, c, l, w = keys[k]
-                    if (j == c and (i, l, w, r, s) in A):
-                        # constr_hash[j, r, s].append(x_vars[i, j, l, w])
-                        vars_constr.append(x_vars[i, j, l, w])
-                
-                if (len(vars_constr) > 0):
-                    model.addConstr(
-                        quicksum(vars_constr) <= y_vars[j],
-                        name=(
-                            "overlapping_constr_" 
-                            + str(j) + "_" 
-                            + str(r) + "_" 
-                            + str(s)
-                        )
-                    )
-
-
+    # for j in range(1, len(y_vars)+1):
+    for j, keys in x_of_board_vars_keys.items():
+        overlapping_constrs |= create_board_overlapping_constr(
+            model, 
+            board_width, 
+            board_height,
+            j,
+            keys,
+            x_vars,
+            y_vars[j],
+            A
+        )
+        # for r in range(board_width):
+        #     for s in range(board_height):
+        #         vars_constr = []
+        #         for k in keys.keys():
+        #             i, c, l, w = k
+        #             if (j == c and (i, l, w, r, s) in A):
+        #                 vars_constr.append(x_vars[i, j, l, w])
+        #         if (len(vars_constr) > 0):
+        #             model.addConstr(
+        #                 quicksum(vars_constr) <= y_vars[j],
+        #                 name=(
+        #                     "overlapping_constr_" 
+        #                     + str(j) + "_" 
+        #                     + str(r) + "_" 
+        #                     + str(s)
+        #                 )
+        #             )
 
     return overlapping_constrs
 
@@ -107,17 +166,15 @@ def create_all_items_must_be_allocated_constr(
     model,
     items,
     x_vars,
-    x_vars_names,
-    number_of_boards
 ):
-    must_be_allocated_constrs = []
+    must_be_allocated_constrs = {}
 
-    for i in range(1, len(items)+1):
+    for i in items.keys():
         items_for_constr = []
         for key in x_vars.keys():
             if (key[0] == i):
                 items_for_constr.append(x_vars[key])
-        must_be_allocated_constrs.append(model.addConstr(
+        must_be_allocated_constrs[i] = model.addConstr(
             quicksum(
                 item
                 for item in items_for_constr
@@ -128,12 +185,12 @@ def create_all_items_must_be_allocated_constr(
                 "must_be_allocated_constrs_" 
                 + str(i)
             )
-        ))
+        )
     
     return must_be_allocated_constrs
 
 
-def create_model(
+def create_original_model(
         items, 
         board_height, 
         board_width, 
@@ -143,7 +200,7 @@ def create_model(
     ):
     model = Model(name=model_name)
 
-    x_vars_names, x_vars = create_x_vars(
+    x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars = create_x_vars(
         model, items, board_height, board_width, number_of_boards
     )
     y_vars_names, y_vars = create_y_vars(
@@ -158,13 +215,11 @@ def create_model(
     
     overlapping_constrs = create_overlapping_constr(
         model, 
-        items,
         board_width,
         board_height,
         x_vars,
-        x_vars_names,
+        x_of_board_vars_keys,
         y_vars,
-        y_vars_names,
         A
     )
 
@@ -172,8 +227,6 @@ def create_model(
         model,
         items,
         x_vars,
-        x_vars_names,
-        number_of_boards
     )
 
 

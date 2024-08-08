@@ -23,14 +23,14 @@ def draw_solution(
         os.mkdir(figures_path)
     
     if (len(x) > 0):
-        plt.clf()
-
         plt.axis('equal')
 
         figure, ax = plt.subplots()
+
         figure.set_figwidth(max_width)
         figure.set_figheight(max_height)
         ax.grid(True)
+
         ax.set_xticks(range(max_width+1))
         ax.set_yticks(range(max_height+1))
 
@@ -72,5 +72,6 @@ def draw_solution(
 
         plt.savefig(file_path)
         plt.close()
-    
+        plt.clf()
+
     return
