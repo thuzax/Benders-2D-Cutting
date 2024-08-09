@@ -1,10 +1,17 @@
 import os
 import sys
 import numpy
-from original_model import *
+from model_manager import *
 from input_manager import read
 from output_manager import draw_solution
 
+
+def calculate_items_areas(items):
+    return {
+        i: item["width"] * item["height"]
+        for i, item in items.items()
+    }
+    
 
 def create_points_cutted_matrix(items, board_height, board_width):
     A = set()
@@ -42,7 +49,8 @@ def run(argv):
         os.mkdir(output_directory)
 
     instance_data, items_ids_mapping = read(input_file)
-
+    items_areas = calculate_items_areas(instance_data["items"])
+    board_area = instance_data["height"] * instance_data["width"]
 
     A = create_points_cutted_matrix(
         instance_data["items"], 
@@ -56,12 +64,15 @@ def run(argv):
         instance_data["items"],
         instance_data["height"],
         instance_data["width"], 
+        items_areas,
+        board_area,
         A,
         number_of_boards,
         "2D-BPP"
     )
     
     print("======================")
+    print_model(model)
     model.optimize()
     # model.computeIIS()
     # print_iis(model)
@@ -99,6 +110,25 @@ def run(argv):
             output_directory,
             k
         )
+
+    # create_subproblem(1, 
+    #     instance_data["items"], 
+    #     instance_data["height"], 
+    #     instance_data["width"], 
+    #     A, 
+    #     "SP1"
+    # )
+
+    model = create_master_problem(
+        instance_data["items"],
+        instance_data["height"],
+        instance_data["width"], 
+        items_areas,
+        board_area,
+        A,
+        number_of_boards,
+        "master-2D-BPP"
+    )
 
     # for var in model.getVars():
     #     if (var.x > 0.5):
