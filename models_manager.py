@@ -17,6 +17,13 @@ def print_iis(model):
         print(text)
         os.remove("iismodel.ilp")
 
+
+def model_is_infeasible(model):
+    return model.status == GRB.INFEASIBLE
+
+def feasible_not_found(model):
+    return (model.SolCount == 0)
+
 def create_x_j_vars(model, items, board_height, board_width, j):
     x_vars_names = {}
     x_vars_keys = {}
@@ -53,36 +60,50 @@ def create_x_vars(model, items, board_height, board_width, number_of_boards):
         x_vars_keys |= vars_data[1]
         x_of_board_vars_keys[j] = vars_data[2]
         x_vars |= vars_data[3]
-        # x_of_board_vars_keys[j] = []
-        # for i in items.keys():
-        #     for l in range(board_width - items[i]["width"] + 1):
-        #         for w in range(board_height - items[i]["height"] + 1):
-        #             var_name = (
-        #                 "x_" 
-        #                 + str(items[i]["id"]) + "_" 
-        #                 + str(j) + "_" 
-        #                 + str(l) + "_" 
-        #                 + str(w)
-        #             )
-        #             x_of_board_vars_keys[j].append((i, j, l, w))
-        #             x_vars_keys[i,j,l,w] = (i,j,l,w)
-        #             x_vars_names[i,j,l,w] = var_name
-        #             x_vars[i,j,l,w] = model.addVar(
-        #                 name=var_name,
-        #                 vtype=GRB.BINARY
-        #             )
+
 
     return (x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars)
 
 
-def create_y_vars(model, number_of_boards):
-    y_vars_names = {}
-    y_vars = {}
+def create_z_vars(model, number_of_boards):
+    z_vars_names = {}
+    z_vars = {}
     for j in range(1, number_of_boards+1):
-        var_name = "y_" + str(j)
-        y_vars_names[j] = var_name
-        y_vars[j] = model.addVar(name=var_name, vtype=GRB.BINARY)
-    return (y_vars_names, y_vars)
+        var_name = "z_" + str(j)
+        z_vars_names[j] = var_name
+        z_vars[j] = model.addVar(name=var_name, vtype=GRB.BINARY)
+    return (z_vars_names, z_vars)
+
+
+def create_standard_board_not_used_constr(
+    model, 
+    items,
+    number_of_boards,
+    board_width,
+    board_height,
+    x_vars,
+    z_vars
+):
+    constr = {}
+    
+    for j in range(1, number_of_boards+1):
+        constr[j] = model.addConstr(
+            quicksum(
+                quicksum(
+                    quicksum(
+                        x_vars[i,j,l,w]
+                        for w in range(board_height - items[i]["height"] + 1)
+                    )
+                    for l in range(board_width - items[i]["width"] + 1)
+                )
+                for i in items.keys()
+            )
+            >=
+            z_vars[j],
+            name="standard_board_not_used_constr_" + str(j)
+        )
+    
+    return constr
 
 
 def create_board_overlapping_constr(
@@ -92,8 +113,8 @@ def create_board_overlapping_constr(
     j,
     keys,
     x_vars,
-    y,
-    A
+    z,
+    point_is_cutted
 ):
     constr = {}
     for r in range(board_width):
@@ -101,13 +122,13 @@ def create_board_overlapping_constr(
             vars_constr = []
             for k in keys:
                 i, c, l, w = k
-                if ((i, l, w, r, s) in A):
+                if ((i, l, w, r, s) in point_is_cutted):
                     vars_constr.append(x_vars[i, j, l, w])
             if (len(vars_constr) > 0):
                 constr[j,r,s] = model.addConstr(
-                    quicksum(vars_constr) <= y,
+                    quicksum(vars_constr) <= z,
                     name=(
-                        "overlapping_constr_" 
+                        "board_overlapping_constr_" 
                         + str(j) + "_" 
                         + str(r) + "_" 
                         + str(s)
@@ -133,14 +154,11 @@ def create_overlapping_constr(
     board_height,
     x_vars,
     x_of_board_vars_keys,
-    y_vars,
-    A
+    z_vars,
+    point_is_cutted
 ):
     overlapping_constrs = {}
     
-    # keys = x_vars_keys
-
-    # for j in range(1, len(y_vars)+1):
     for j, keys in x_of_board_vars_keys.items():
         overlapping_constrs |= create_board_overlapping_constr(
             model, 
@@ -149,26 +167,9 @@ def create_overlapping_constr(
             j,
             keys,
             x_vars,
-            y_vars[j],
-            A
+            z_vars[j],
+            point_is_cutted
         )
-        # for r in range(board_width):
-        #     for s in range(board_height):
-        #         vars_constr = []
-        #         for k in keys.keys():
-        #             i, c, l, w = k
-        #             if (j == c and (i, l, w, r, s) in A):
-        #                 vars_constr.append(x_vars[i, j, l, w])
-        #         if (len(vars_constr) > 0):
-        #             model.addConstr(
-        #                 quicksum(vars_constr) <= y_vars[j],
-        #                 name=(
-        #                     "overlapping_constr_" 
-        #                     + str(j) + "_" 
-        #                     + str(r) + "_" 
-        #                     + str(s)
-        #                 )
-        #             )
 
     return overlapping_constrs
 
@@ -226,13 +227,13 @@ def create_items_areas_constr(
 
 def create_symmetry_cuts_constr(
     model,
-    y_vars,
+    z_vars,
     number_of_boards
 ):
     constr = {}
     for j in range(2, number_of_boards+1):
         constr[j-1, j] = model.addConstr(
-            y_vars[j-1] >= y_vars[j],
+            z_vars[j-1] >= z_vars[j],
             name="symmetry_cut_" + str(j-1) + "_" + str(j)
         )
     return constr
@@ -244,7 +245,7 @@ def create_item_board_allocation_constr(
     items_areas,
     board_area,
     number_of_boards,
-    y_vars,
+    z_vars,
     b_vars
 ):
     constr = {}
@@ -252,10 +253,36 @@ def create_item_board_allocation_constr(
         constr[j] = model.addConstr(
             quicksum(items_areas[i] * b_vars[i,j] for i in items.keys()) 
             <= 
-            board_area * y_vars[j],
+            board_area * z_vars[j],
             name="item_board_allocation_" + str(j)
         )
     return constr
+
+
+def create_board_not_used_constr(
+    model,
+    items,
+    number_of_boards,
+    b_vars,
+    z_vars
+):
+    board_not_used = {}
+
+    for j in range(1, number_of_boards+1):
+        board_not_used[j] = model.addConstr(
+            quicksum(
+                b_vars[i, j]
+                for i in items.keys()
+            )
+            >=
+            z_vars[j],
+            name=(
+                "board_not_used_constr_" 
+                + str(j)
+            )
+        )
+    
+    return board_not_used
 
 def create_all_items_must_be_on_a_board_constr(
     model,
@@ -279,7 +306,6 @@ def create_feasibility_cut_expr_for_j(
 ):
     allocated_boards = {}
     for key, b_var in subproblem_inf_sol.items():
-        print(key)
         if (b_var > 0.5):
             i, k = key
             allocated_boards[i, j] = model._b_vars[i, j]
@@ -311,13 +337,6 @@ def create_feasibility_cut_expr_for_subproblem(
         )
     return constr_expr
 
-def create_feasibility_cut_expr(
-    model,
-    number_of_boards
-):
-    pass
-    # solve_subproblem
-    # create_feasibility_cut_expr(solution)
 
 
 
@@ -338,29 +357,29 @@ def create_feasibility_cut_expr(
 
 
 
-
-
-def create_original_model(
+def create_standard_model(
     items, 
     board_height, 
     board_width, 
     items_areas,
     board_area,
-    A, 
+    point_is_cutted, 
     number_of_boards,
     model_name
 ):
     model = Model(name=model_name)
+    model.Params.TimeLimit = 900
+
 
     x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars = create_x_vars(
         model, items, board_height, board_width, number_of_boards
     )
-    y_vars_names, y_vars = create_y_vars(
+    z_vars_names, z_vars = create_z_vars(
         model, number_of_boards
     )
 
     model.setObjective(
-        quicksum(y_vars[j] for j in range(1, len(y_vars)+1)),
+        quicksum(j * z_vars[j] for j in range(1, len(z_vars)+1)),
         sense=GRB.MINIMIZE
     )
 
@@ -371,8 +390,8 @@ def create_original_model(
         board_height,
         x_vars,
         x_of_board_vars_keys,
-        y_vars,
-        A
+        z_vars,
+        point_is_cutted
     )
 
     must_be_allocated_constrs = create_all_items_must_be_allocated_constr(
@@ -389,10 +408,18 @@ def create_original_model(
         x_of_board_vars_keys
     )
 
-    symmetry_custs = create_symmetry_cuts_constr(model, y_vars, number_of_boards)
+    symmetry_custs = create_symmetry_cuts_constr(model, z_vars, number_of_boards)
 
-    # print_model(model)
-    # print(A)
+    boards_not_used = create_standard_board_not_used_constr(
+        model,
+        items,
+        number_of_boards,
+        board_width,
+        board_height,
+        x_vars,
+        z_vars
+    )
+
     return model
 
 
@@ -401,11 +428,12 @@ def create_subproblem(
     items, 
     board_height, 
     board_width, 
-    A, 
+    point_is_cutted, 
     model_name
 ):
     
     model = Model(name=model_name)
+    model.Params.OutputFlag = 0
 
     x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars = create_x_j_vars(
         model, items, board_height, board_width, j
@@ -425,7 +453,7 @@ def create_subproblem(
         x_of_board_vars_keys, 
         x_vars, 
         1, 
-        A 
+        point_is_cutted 
     )
 
     must_be_allocated_constrs = create_all_items_must_be_allocated_constr(
@@ -434,8 +462,6 @@ def create_subproblem(
         x_vars
     )
 
-    print_model(model)
-    # print(A)
     return model
 
 def create_master_problem(
@@ -444,21 +470,24 @@ def create_master_problem(
     board_width, 
     items_areas,
     board_area,
-    A, 
+    point_is_cutted, 
     number_of_boards,
     model_name
 ):
     
     model = Model(name=model_name)
 
-    y_vars_names, y_vars = create_y_vars(
+    model.Params.LazyConstraints = 1
+    model.Params.TimeLimit = 900
+
+    z_vars_names, z_vars = create_z_vars(
         model, number_of_boards
     )
 
     b_vars_names, b_vars = create_b_vars(model, items, number_of_boards)
 
     model.setObjective(
-        quicksum(y_vars[j] for j in range(1, len(y_vars)+1)),
+        quicksum(j * z_vars[j] for j in range(1, len(z_vars)+1)),
         sense=GRB.MINIMIZE
     )
 
@@ -468,7 +497,7 @@ def create_master_problem(
         items_areas, 
         board_area, 
         number_of_boards, 
-        y_vars, 
+        z_vars, 
         b_vars
     )
 
@@ -481,22 +510,197 @@ def create_master_problem(
 
     symmetry_custs = create_symmetry_cuts_constr(
         model, 
-        y_vars, 
+        z_vars, 
         number_of_boards
     )
 
+    board_not_used = create_board_not_used_constr(
+        model,
+        items,
+        number_of_boards,
+        b_vars,
+        z_vars
+    )
 
-    inf_sol = {
-        (1, 1): 1, (1, 2): 0, (1, 3): 0, (1, 4): 0,
-        (2, 1): 1, (2, 2): 0, (2, 3): 0, (2, 4): 0,
-        (3, 1): 1, (3, 2): 0, (3, 3): 0, (3, 4): 0,
-        (4, 1): 1, (4, 2): 0, (4, 3): 0, (4, 4): 0
+    # problem params
+    model._number_of_boards = number_of_boards
+    # subproblem params
+    model._items = items
+    model._board_height = board_height
+    model._board_width = board_width
+    model._point_is_cutted = point_is_cutted
+
+    # master variables
+    model._b_vars = b_vars
+    model._z_vars = z_vars
+
+    # Lazy constraints set
+    model._lazy_set = set()
+
+    return model
+
+
+def solve_subproblem_j(
+    j, 
+    items, 
+    board_height, 
+    board_width, 
+    point_is_cutted,
+    b_values
+):
+    if (len(items) <= 0):
+        # print("Not allocated in board " + str(j))
+        return {"feasible" : {}, "infeasible" : {}}
+    
+
+    subproblem_model = create_subproblem(
+        j, 
+        items, 
+        board_height, 
+        board_width, 
+        point_is_cutted, 
+        "subproblem_" + str(j)
+    )
+    
+    subproblem_model.optimize()
+    
+    if (subproblem_model.status == GRB.INFEASIBLE):
+        subproblem_inf = {}
+        for i in items.keys():
+            subproblem_inf[i, j] = b_values[i, j]
+        return {"feasible" : {}, "infeasible" : subproblem_inf}
+    
+    subproblem_solution = {
+        var.VarName : var.x 
+        for var in subproblem_model.getVars()
     }
 
-    model._b_vars = b_vars
+    return {"feasible" : subproblem_solution, "infeasible" : {}}
 
-    constr_expr = create_feasibility_cut_expr_for_subproblem(model, 4, inf_sol)
-    for expr in constr_expr.values():
-        model.addConstr(expr)
 
-    print_model(model)
+def solve_subproblems(
+    all_items,
+    number_of_boards,
+    board_height,
+    board_width,
+    point_is_cutted,
+    b_values
+):
+    subproblems_sol = {"infeasible" : {}, "feasible" : {}}
+
+    for j in range(1, number_of_boards+1):
+        items = {
+            i : item
+            for i, item in all_items.items()
+            if (b_values[i, j] > 0.5)
+        }
+        solutions = solve_subproblem_j(
+            j, 
+            items,
+            board_height,
+            board_width,
+            point_is_cutted,
+            b_values
+        )
+        if (len(solutions["feasible"]) > 0):
+            subproblems_sol["feasible"][j] = solutions["feasible"]
+        if (len(solutions["infeasible"]) > 0):
+            subproblems_sol["infeasible"][j] = solutions["infeasible"]
+    
+    return subproblems_sol
+
+def add_benders_cuts(
+    model,
+    subproblems_inf
+):
+    
+    for j in subproblems_inf.keys():
+        if (len(subproblems_inf[j]) == 0):
+            continue
+        feasibility_cuts_expr = create_feasibility_cut_expr_for_subproblem(
+            model, 
+            model._number_of_boards,
+            subproblems_inf[j]
+        )
+        for expr in feasibility_cuts_expr.values():
+            model.cbLazy(expr)
+            model._lazy_set.add(expr)
+
+
+def master_call_back(model, where):
+    if where == GRB.Callback.MIPSOL:
+        try:
+            b_values = model.cbGetSolution(model._b_vars)
+            z_values = model.cbGetSolution(model._z_vars)
+            
+            subproblems_sol = solve_subproblems(
+                model._items,
+                model._number_of_boards,
+                model._board_height,
+                model._board_width,
+                model._point_is_cutted,
+                b_values
+            )            
+            
+            if (len(subproblems_sol["infeasible"]) > 0):
+                add_benders_cuts(
+                    model,
+                    subproblems_sol["infeasible"],
+                )
+            else:
+                model._x_vars = {}
+                for j, solutions_vars in subproblems_sol["feasible"].items():
+                    model._x_vars |= solutions_vars
+                
+        except Exception as ex:
+            model.terminate()
+            raise ex
+
+
+
+def get_solution_dict(model):
+    data = {
+        "variables": None,
+        "objective": None,
+        "is_optimal": False,
+        "inf_or_unb": False,
+        "feasible_found": False,
+        "node_count": None,
+        "total_time": None
+    }
+    data["total_time"] = model.Runtime
+
+    if (model.status == GRB.INFEASIBLE):
+        data["inf_or_unb"] = True
+        return data
+    
+    if (model.status == GRB.UNBOUNDED):
+        data["inf_or_unb"] = True
+        return data
+
+    data["node_count"] = model.NodeCount
+
+    if (model.SolCount == 0):
+        return data
+    
+
+    data["variables"] = {}
+    for v in model.getVars():
+        data["variables"][v.VarName] = v.X
+
+    if (model.status == GRB.OPTIMAL):
+        data["is_optimal"] = True
+
+    data["feasible_found"] = True
+    data["objective"] = model.getObjective().getValue()
+    data["dual_bound"] = model.ObjBound
+
+    return data
+
+
+def get_solution_dict_MIP(model):
+    data = get_solution_dict(model)
+    data["gap"] = None
+    if (data["is_optimal"] or "feasible_found"):
+        data["gap"] = model.MIPGap
+    return data
