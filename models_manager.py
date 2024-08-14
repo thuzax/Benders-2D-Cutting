@@ -1,5 +1,19 @@
 import os
+import time
 from gurobipy import *
+
+def set_parameters(model, log_path="", problem_type="standard"):
+    if (problem_type == "subproblem"):
+        # model.Params.OutputFlag = 0
+        # model.Params.LogToConsole = 0
+        return
+    if (problem_type == "master_problem"):
+        model.Params.LazyConstraints = 1
+    
+    model.Params.TimeLimit = 900
+    if (log_path != ""):
+        model.Params.LogToConsole = 0
+        model.Params.LogFile = log_path
 
 
 def print_model(model):
@@ -365,12 +379,12 @@ def create_standard_model(
     board_area,
     point_is_cutted, 
     number_of_boards,
-    model_name
+    model_name,
+    log_path
 ):
     model = Model(name=model_name)
-    model.Params.TimeLimit = 900
-
-
+    set_parameters(model, log_path)
+    
     x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars = create_x_vars(
         model, items, board_height, board_width, number_of_boards
     )
@@ -420,6 +434,8 @@ def create_standard_model(
         z_vars
     )
 
+    model._cb_total_time = 0
+
     return model
 
 
@@ -433,7 +449,7 @@ def create_subproblem(
 ):
     
     model = Model(name=model_name)
-    model.Params.OutputFlag = 0
+    set_parameters(model, problem_type="subproblem")
 
     x_vars_names, x_vars_keys, x_of_board_vars_keys, x_vars = create_x_j_vars(
         model, items, board_height, board_width, j
@@ -472,13 +488,12 @@ def create_master_problem(
     board_area,
     point_is_cutted, 
     number_of_boards,
-    model_name
+    model_name,
+    log_path
 ):
     
     model = Model(name=model_name)
-
-    model.Params.LazyConstraints = 1
-    model.Params.TimeLimit = 900
+    set_parameters(model, log_path, "master_problem")
 
     z_vars_names, z_vars = create_z_vars(
         model, number_of_boards
@@ -536,6 +551,8 @@ def create_master_problem(
 
     # Lazy constraints set
     model._lazy_set = set()
+    # total time spent on callback
+    model._cb_total_time = 0
 
     return model
 
@@ -630,6 +647,7 @@ def add_benders_cuts(
 def master_call_back(model, where):
     if where == GRB.Callback.MIPSOL:
         try:
+            cb_start_time = time.time()
             b_values = model.cbGetSolution(model._b_vars)
             z_values = model.cbGetSolution(model._z_vars)
             
@@ -651,7 +669,7 @@ def master_call_back(model, where):
                 model._x_vars = {}
                 for j, solutions_vars in subproblems_sol["feasible"].items():
                     model._x_vars |= solutions_vars
-                
+            model._cb_total_time += time.time() - cb_start_time
         except Exception as ex:
             model.terminate()
             raise ex
@@ -703,4 +721,5 @@ def get_solution_dict_MIP(model):
     data["gap"] = None
     if (data["is_optimal"] or "feasible_found"):
         data["gap"] = model.MIPGap
+    data["cb_total_time"] = model._cb_total_time
     return data

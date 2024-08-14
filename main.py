@@ -4,6 +4,7 @@ import math
 import json
 import csv
 import time
+import signal
 from models_manager import *
 from input_manager import read
 from output_manager import draw_solution
@@ -96,7 +97,7 @@ def calculate_number_of_boards(items_areas, board_area):
     return math.ceil((math.ceil(sum(items_areas.values())/board_area)) * 1.2)
 
 
-def run_standard_model(instance_data, point_is_cutted):    
+def run_standard_model(instance_data, point_is_cutted, log_path=""):    
 
     model = create_standard_model(
         instance_data["items"],
@@ -106,7 +107,8 @@ def run_standard_model(instance_data, point_is_cutted):
         instance_data["board_area"],
         point_is_cutted,
         instance_data["number_of_boards"],
-        "standard-2D-BPP"
+        "standard-2D-BPP",
+        log_path
     )
 
     model.optimize()
@@ -115,6 +117,10 @@ def run_standard_model(instance_data, point_is_cutted):
         model.computeIIS()
         print_iis(model)
 
+    if (feasible_not_found(model)):
+        model.close()
+        return ({}, {}, {})
+    
     z_vars_dict = {}
     x_vars_dict = {}
     for var in model.getVars():
@@ -125,12 +131,15 @@ def run_standard_model(instance_data, point_is_cutted):
             if (var.x > 0.5):
                 x_vars_dict[var.VarName] = var.x
 
+
     sol_dict = get_solution_dict_MIP(model)
+
+    model.close()
 
     return (x_vars_dict, z_vars_dict, sol_dict)
 
 
-def run_benders_model(instance_data, point_is_cutted):
+def run_benders_model(instance_data, point_is_cutted, log_path=""):
 
     model = create_master_problem(
         instance_data["items"],
@@ -140,7 +149,8 @@ def run_benders_model(instance_data, point_is_cutted):
         instance_data["board_area"],
         point_is_cutted,
         instance_data["number_of_boards"],
-        "master-2D-BPP"
+        "master-2D-BPP",
+        log_path
     )
 
     model.optimize(master_call_back)
@@ -150,7 +160,8 @@ def run_benders_model(instance_data, point_is_cutted):
         print_iis(model)
 
     if (feasible_not_found(model)):
-        return ({}, {})
+        model.close()
+        return ({}, {}, {})
 
     z_vars_dict = {}
     for var in model.getVars():
@@ -164,11 +175,13 @@ def run_benders_model(instance_data, point_is_cutted):
 
     sol_dict = get_solution_dict_MIP(model)
 
+    model.close()
+
     return (model._x_vars, z_vars_dict, sol_dict)
 
 def run(argv):
     start_time = time.time()
-    
+
     if (len(argv) < 2):
         print("1. Needs instance name")
         print("2. Needs output directory")
@@ -199,19 +212,25 @@ def run(argv):
         instance_data["width"]
     )
 
+    print("Set with a_{i,l,w,r,s} created")
+
     draw_prefix = ""
     
+    log_path = os.path.join(output_directory, "solution.log")
+
     if (len(argv) >= 3 and int(argv[2]) == 1):
         x_vars_dict, z_vars_dict, sol_dict = run_benders_model(
             instance_data, 
-            point_is_cutted
+            point_is_cutted,
+            log_path
         )
         draw_prefix = "benders_"
     
     else:
         x_vars_dict, z_vars_dict, sol_dict = run_standard_model(
             instance_data, 
-            point_is_cutted
+            point_is_cutted,
+            log_path
         )
         draw_prefix = "standard_"
     

@@ -1,5 +1,8 @@
 import sys
 import os
+import gc
+import signal
+import multiprocessing
 from main import run
 
 def get_input_files(input_dir):
@@ -27,7 +30,18 @@ def run_model(input_files, output_dir, code, prefix=""):
     for input_file in input_files:
         file_base_name = os.path.basename(input_file).split(".")[0]
         output_local = os.path.join(output_dir, prefix + "_" + file_base_name)
-        run([input_file, output_local, code])
+        args = (input_file, output_local, code)
+        p = multiprocessing.Process(target=run, args=(args,))
+        p.start()
+        p.join()
+        print(p)
+
+        if (p.exitcode == signal.SIGKILL):
+            file_name = os.path.join(output_local, "error.log")
+            with open(file_name, "w") as out_err:
+                out_err.write("Processo morto. Provavelmente memória estouro.")
+
+        gc.collect()
         i += 1
 
 if __name__=="__main__":
