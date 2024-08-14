@@ -11,9 +11,10 @@ def draw_solution(
     max_width, 
     max_height, 
     output_directory,
-    board_id,
+    bin_id,
     prefix
 ):
+    '''Plot the solution by drawing the items on the bins'''
 
     figures_path = file_path = os.path.join(
         output_directory, 
@@ -68,7 +69,7 @@ def draw_solution(
         
         file_path = os.path.join(
             figures_path,
-            prefix + str(board_id) + ".png"
+            prefix + str(bin_id) + ".png"
         )
 
         plt.savefig(file_path)

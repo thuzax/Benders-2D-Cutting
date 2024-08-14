@@ -6,6 +6,7 @@ import multiprocessing
 from main import run
 
 def get_input_files(input_dir):
+    '''Get the input files from input dir'''
     input_files = []
     for item in os.listdir(input_dir):
         item_path = os.path.join(input_dir, item)
@@ -14,23 +15,20 @@ def get_input_files(input_dir):
     
     input_files = sorted(input_files)
     return input_files
-
-
-def print_arguments(args):
-    print("ARGUMENTS: ")
-    print("\tINPUT FILE:\t", args[0]) 
-    print("\tCONFIGURATION FILE:\t", args[1])
-    print("\tOUTPUT RESULT PATH:\t", args[2])
-    print("\tOUTPUT MODEL PATH:\t", args[3])
-    print("\tLOG FILE PATH:\t", args[4])
             
 
 def run_model(input_files, output_dir, code, prefix=""):
+    '''Run the model for all input files and save on output direcotry. The results will be saved on an output directory with 
+    name = prefix + basename(input_file)'''
     i = 0
     for input_file in input_files:
+        
         file_base_name = os.path.basename(input_file).split(".")[0]
         output_local = os.path.join(output_dir, prefix + "_" + file_base_name)
         args = (input_file, output_local, code)
+        
+        # Create a new process to avoid SIGKILL 
+        # if gurobi have out of memory  error
         p = multiprocessing.Process(target=run, args=(args,))
         p.start()
         p.join()
@@ -39,7 +37,7 @@ def run_model(input_files, output_dir, code, prefix=""):
         if (p.exitcode == signal.SIGKILL):
             file_name = os.path.join(output_local, "error.log")
             with open(file_name, "w") as out_err:
-                out_err.write("Processo morto. Provavelmente memória estouro.")
+                out_err.write("Processo morto. Provavelmente memória estourou.")
 
         gc.collect()
         i += 1
@@ -56,6 +54,7 @@ if __name__=="__main__":
 
     input_files = get_input_files(input_dir)
 
-
+    # Run model for standard formulation
     run_model(input_files, output_dir, 0, "standard")
+    # Run model for benders formulation
     run_model(input_files, output_dir, 1, "benders")
