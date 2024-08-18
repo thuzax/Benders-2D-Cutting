@@ -16,10 +16,10 @@
   "inf_or_unb": false,
   "feasible_found": true,
   "node_count": 0.0,
-  "total_time": 0.02414107322692871,
+  "total_time": 0.004790067672729492,
   "dual_bound": 1.0,
   "gap": 0.0,
-  "cb_total_time": 0.005056619644165039,
-  "opt_time": 0.02893686294555664,
-  "real_time": 0.05636096000671387
+  "cb_total_time": 0.002389192581176758,
+  "opt_time": 0.005079030990600586,
+  "real_time": 0.010023117065429688
 }

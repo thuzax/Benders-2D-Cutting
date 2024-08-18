@@ -208,9 +208,10 @@
   "inf_or_unb": false,
   "feasible_found": true,
   "node_count": 1.0,
-  "total_time": 0.00828695297241211,
+  "total_time": 0.007966995239257812,
   "dual_bound": 1.0,
   "gap": 0.0,
   "cb_total_time": 0,
-  "real_time": 0.01869368553161621
+  "opt_time": 0.008229732513427734,
+  "real_time": 0.018807649612426758
 }

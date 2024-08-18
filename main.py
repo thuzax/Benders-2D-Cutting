@@ -119,6 +119,7 @@ def run_standard_model(
     )
 
     print("STARTING OPT")
+    s = time.time()
     model.optimize()
     opt_time = time.time() - s
     print("opt time:", time.time() - s)
@@ -167,8 +168,8 @@ def run_benders_model(instance_data, point_is_cutted, time_limit, log_path=""):
         log_path,
         time_limit
     )
-    s = time.time()
     print("STARTING OPT")
+    s = time.time()
     model.optimize(master_call_back)
     opt_time = time.time() - s
     print("opt time:", time.time() - s)

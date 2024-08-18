@@ -11,7 +11,7 @@ def set_parameters(model, time_limit, log_path="", problem_type="standard"):
     model.Params.TimeLimit = time_limit
     if (problem_type == "subproblem"):
         # model.Params.OutputFlag = 0
-        model.Params.LogToConsole = 0
+        # model.Params.LogToConsole = 0
         return
     if (problem_type == "master_problem"):
         model.Params.LazyConstraints = 1
@@ -518,7 +518,7 @@ def solve_subproblem_j(
     subproblem_model.Params.TimeLimit = (
         model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME)
     )
-
+    subproblem_model.Params.OutputFlag = 0
     subproblem_model.optimize()
     
     # If it is infeasible, get the variables b[i, j], that is, the value of the 
