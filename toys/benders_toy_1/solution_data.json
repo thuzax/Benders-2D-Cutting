@@ -1,0 +1,25 @@
+{
+  "variables": {
+    "z_1": 1.0,
+    "z_2": -0.0,
+    "b_1_1": 1.0,
+    "b_1_2": 0.0,
+    "b_2_1": 1.0,
+    "b_2_2": 0.0,
+    "b_3_1": 1.0,
+    "b_3_2": 0.0,
+    "b_4_1": 1.0,
+    "b_4_2": 0.0
+  },
+  "objective": 1.0,
+  "is_optimal": true,
+  "inf_or_unb": false,
+  "feasible_found": true,
+  "node_count": 0.0,
+  "total_time": 0.02414107322692871,
+  "dual_bound": 1.0,
+  "gap": 0.0,
+  "cb_total_time": 0.005056619644165039,
+  "opt_time": 0.02893686294555664,
+  "real_time": 0.05636096000671387
+}

@@ -97,7 +97,12 @@ def calculate_number_of_bins(items_areas, bin_area):
     return math.ceil((math.ceil(sum(items_areas.values())/bin_area)) * 1.2)
 
 
-def run_standard_model(instance_data, point_is_cutted, log_path=""):    
+def run_standard_model(
+    instance_data, 
+    point_is_cutted, 
+    time_limit,
+    log_path="" 
+):    
     '''Construct and run the complete model'''
     
     model = create_standard_model(
@@ -109,10 +114,14 @@ def run_standard_model(instance_data, point_is_cutted, log_path=""):
         point_is_cutted,
         instance_data["number_of_bins"],
         "standard-2D-BPP",
-        log_path
+        log_path,
+        time_limit
     )
 
+    print("STARTING OPT")
     model.optimize()
+    opt_time = time.time() - s
+    print("opt time:", time.time() - s)
 
     # If infeasible calculate the infeasible constraints
     if (model_is_infeasible(model)):
@@ -137,13 +146,14 @@ def run_standard_model(instance_data, point_is_cutted, log_path=""):
 
     # Create a dictionary with data related to the solution
     sol_dict = get_solution_dict_MIP(model)
+    sol_dict["opt_time"] = opt_time
 
     model.close()
 
     return (x_vars_dict, z_vars_dict, sol_dict)
 
 
-def run_benders_model(instance_data, point_is_cutted, log_path=""):
+def run_benders_model(instance_data, point_is_cutted, time_limit, log_path=""):
 
     model = create_master_problem(
         instance_data["items"],
@@ -154,11 +164,15 @@ def run_benders_model(instance_data, point_is_cutted, log_path=""):
         point_is_cutted,
         instance_data["number_of_bins"],
         "master-2D-BPP",
-        log_path
+        log_path,
+        time_limit
     )
-
+    s = time.time()
+    print("STARTING OPT")
     model.optimize(master_call_back)
-
+    opt_time = time.time() - s
+    print("opt time:", time.time() - s)
+    
     # If infeasible calculate the infeasible constraints
     if (model_is_infeasible(model)):
         model.computeIIS(master_call_back)
@@ -182,7 +196,8 @@ def run_benders_model(instance_data, point_is_cutted, log_path=""):
 
     # Create a dictionary with data related to the solution
     sol_dict = get_solution_dict_MIP(model)
-
+    sol_dict["opt_time"] = opt_time
+    
     model.close()
 
     return (model._x_vars, z_vars_dict, sol_dict)
@@ -226,13 +241,14 @@ def run(argv):
 
     draw_prefix = ""
     log_path = os.path.join(output_directory, "solution.log")
-
+    time_limit = 60
     # argv[2] indicates the solution method. If 1, then use benders. Otherwise, use the complete model
     if (len(argv) >= 3 and int(argv[2]) == 1):
         x_vars_dict, z_vars_dict, sol_dict = run_benders_model(
             instance_data, 
             point_is_cutted,
-            log_path
+            time_limit,
+            log_path 
         )
         draw_prefix = "benders_"
     
@@ -240,6 +256,7 @@ def run(argv):
         x_vars_dict, z_vars_dict, sol_dict = run_standard_model(
             instance_data, 
             point_is_cutted,
+            time_limit,
             log_path
         )
         draw_prefix = "standard_"

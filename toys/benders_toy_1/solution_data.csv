@@ -1,0 +1,2 @@
+objective,is_optimal,inf_or_unb,feasible_found,node_count,total_time,dual_bound,gap,cb_total_time,opt_time,real_time
+1.0,True,False,True,0.0,0.02414107322692871,1.0,0.0,0.005056619644165039,0.02893686294555664,0.05636096000671387

@@ -7,7 +7,7 @@ def draw_solution(
     items, 
     items_ids_mapping, 
     x, 
-    z, 
+    y, 
     max_width, 
     max_height, 
     output_directory,
@@ -45,8 +45,8 @@ def draw_solution(
             ]
             
             axis_y = [
-                z[item_id], z[item_id], z[item_id] + items[i]["height"], 
-                z[item_id] + items[i]["height"], z[item_id]
+                y[item_id], y[item_id], y[item_id] + items[i]["height"], 
+                y[item_id] + items[i]["height"], y[item_id]
             ]
 
             axis_x = numpy.array(axis_x)
@@ -60,7 +60,7 @@ def draw_solution(
                 
             plt.text(
                 x[item_id] + (items[i]["width"]/2) - (items[i]["width"]/50), 
-                z[item_id] + (items[i]["height"]/2) - (items[i]["height"]/50), 
+                y[item_id] + (items[i]["height"]/2) - (items[i]["height"]/50), 
                 items_ids_mapping[item_id], 
                 size=20, 
                 color='black'

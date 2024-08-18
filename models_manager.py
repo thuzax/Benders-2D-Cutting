@@ -6,16 +6,17 @@ from gurobipy import *
 # Auxiliaries functions starts below
 ################################################################################
 
-def set_parameters(model, log_path="", problem_type="standard"):
+def set_parameters(model, time_limit, log_path="", problem_type="standard"):
     '''Set Gurobi Parameters'''
+    model.Params.TimeLimit = time_limit
     if (problem_type == "subproblem"):
         # model.Params.OutputFlag = 0
-        # model.Params.LogToConsole = 0
+        model.Params.LogToConsole = 0
         return
     if (problem_type == "master_problem"):
         model.Params.LazyConstraints = 1
     
-    model.Params.TimeLimit = 900
+    # model.Params.TimeLimit = time_limit
     if (log_path != ""):
         model.Params.LogToConsole = 0
         model.Params.LogFile = log_path
@@ -486,7 +487,9 @@ def solve_subproblem_j(
     bin_height, 
     bin_width, 
     point_is_cutted,
-    b_values
+    b_values,
+    model,
+    cb_start_time
 ):
     '''Solve the subproblem of bin j'''
 
@@ -502,9 +505,18 @@ def solve_subproblem_j(
         bin_height, 
         bin_width, 
         point_is_cutted, 
-        "subproblem_" + str(j)
+        "subproblem_" + str(j),
+        1
     )
-    # Solve model
+    
+    print(model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME))
+
+    if (model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME) <= 0):
+        model.terminate()
+        model._subproblems_incomplete = True
+        return {"feasible" : {}, "infeasible" : {}}
+
+
     subproblem_model.optimize()
     
     # If it is infeasible, get the variables b[i, j], that is, the value of the 
@@ -516,6 +528,10 @@ def solve_subproblem_j(
             subproblem_inf[i, j] = b_values[i, j]
         return {"feasible" : {}, "infeasible" : subproblem_inf}
     
+    if (feasible_not_found(subproblem_model)):
+        model.terminate()
+        model._subproblems_incomplete = True
+        return {"feasible" : {}, "infeasible" : {}}
     # If there is a solution, then create a dictionary with the solutions
     subproblem_solution = {
         var.VarName : var.x 
@@ -531,7 +547,9 @@ def solve_subproblems(
     bin_height,
     bin_width,
     point_is_cutted,
-    b_values
+    b_values,
+    model,
+    cb_start_time
 ):
     '''Solve the subproblem of each bin'''
     
@@ -553,7 +571,9 @@ def solve_subproblems(
             bin_height,
             bin_width,
             point_is_cutted,
-            b_values
+            b_values,
+            model,
+            cb_start_time
         )
 
         # If solution is feasible, store as a feasible solution
@@ -562,7 +582,7 @@ def solve_subproblems(
         # If solution is infeasible, store as an infeasible solution
         if (len(solutions["infeasible"]) > 0):
             subproblems_sol["infeasible"][j] = solutions["infeasible"]
-    
+
     # Return the feasible and infeasible solutions
     return subproblems_sol
 
@@ -606,9 +626,14 @@ def master_call_back(model, where):
                 model._bin_height,
                 model._bin_width,
                 model._point_is_cutted,
-                b_values
-            )            
-            
+                b_values,
+                model,
+                cb_start_time
+            )
+
+            if (model._subproblems_incomplete):
+                return
+
             # If there is at least one infeasible solution, then add benders monotone no good cuts
             if (len(subproblems_sol["infeasible"]) > 0):
                 add_benders_cuts(
@@ -642,12 +667,12 @@ def create_standard_model(
     point_is_cutted, 
     number_of_bins,
     model_name,
-    log_path
+    log_path,
+    time_limit
 ):
     '''Create standard model, that is, the complete model.'''
     
     model = Model(name=model_name)
-    set_parameters(model, log_path)
     
     # Create variables
     x_vars_names, x_vars_keys, x_of_bin_vars_keys, x_vars = create_x_vars(
@@ -702,6 +727,7 @@ def create_standard_model(
     )
 
     model._cb_total_time = 0
+    set_parameters(model, time_limit=time_limit, log_path=log_path)
 
     return model
 
@@ -712,11 +738,11 @@ def create_subproblem(
     bin_height, 
     bin_width, 
     point_is_cutted, 
-    model_name
+    model_name,
+    time_limit
 ):
     '''Create a subproblem model.'''
     model = Model(name=model_name)
-    set_parameters(model, problem_type="subproblem")
 
     # Create variables
     x_vars_names, x_vars_keys, x_of_bin_vars_keys, x_vars = create_x_j_vars(
@@ -746,6 +772,7 @@ def create_subproblem(
         x_vars
     )
 
+    set_parameters(model, time_limit=time_limit, problem_type="subproblem")
     return model
 
 def create_master_problem(
@@ -757,11 +784,12 @@ def create_master_problem(
     point_is_cutted, 
     number_of_bins,
     model_name,
-    log_path
+    log_path, 
+    time_limit
 ):
     '''Create a Benders master model'''
     model = Model(name=model_name)
-    set_parameters(model, log_path, "master_problem")
+    
 
     # Create variables
     z_vars_names, z_vars = create_z_vars(
@@ -825,5 +853,15 @@ def create_master_problem(
     model._lazy_set = set()
     # total time spent on callback
     model._cb_total_time = 0
+
+    model._subproblems_incomplete = False
+    model._x_vars = {}
+
+    set_parameters(
+        model, 
+        time_limit=time_limit, 
+        log_path=log_path,
+        problem_type="master_problem"
+    )
 
     return model

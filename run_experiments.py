@@ -34,7 +34,7 @@ def run_model(input_files, output_dir, code, prefix=""):
         p.join()
         print(p)
 
-        if (p.exitcode == signal.SIGKILL):
+        if (p.exitcode != 0):
             file_name = os.path.join(output_local, "error.log")
             with open(file_name, "w") as out_err:
                 out_err.write("Processo morto. Provavelmente memória estourou.")
@@ -55,6 +55,6 @@ if __name__=="__main__":
     input_files = get_input_files(input_dir)
 
     # Run model for standard formulation
-    run_model(input_files, output_dir, 0, "standard")
+    # run_model(input_files, output_dir, 0, "standard")
     # Run model for benders formulation
     run_model(input_files, output_dir, 1, "benders")
