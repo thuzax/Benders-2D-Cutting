@@ -55,6 +55,6 @@ if __name__=="__main__":
     input_files = get_input_files(input_dir)
 
     # Run model for standard formulation
-    # run_model(input_files, output_dir, 0, "standard")
+    run_model(input_files, output_dir, 0, "standard")
     # Run model for benders formulation
     run_model(input_files, output_dir, 1, "benders")

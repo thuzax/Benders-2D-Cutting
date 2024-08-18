@@ -509,13 +509,15 @@ def solve_subproblem_j(
         1
     )
     
-    print(model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME))
-
     if (model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME) <= 0):
         model.terminate()
         model._subproblems_incomplete = True
         return {"feasible" : {}, "infeasible" : {}}
 
+
+    subproblem_model.Params.TimeLimit = (
+        model.Params.TimeLimit - model.cbGet(GRB.Callback.RUNTIME)
+    )
 
     subproblem_model.optimize()
     
