@@ -210,7 +210,7 @@ def run(argv):
         print("1. Needs instance name")
         print("2. Needs output directory")
         text = "3. (Optional, Default = 0) "
-        text += "Which method will be used: 1 - Benders; 2 - Standard Model" 
+        text += "Which method will be used: 1 - Benders; 0 - Standard Model" 
         print(text)
         exit(0)
 
