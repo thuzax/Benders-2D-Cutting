@@ -242,7 +242,7 @@ def run(argv):
 
     draw_prefix = ""
     log_path = os.path.join(output_directory, "solution.log")
-    time_limit = 60
+    time_limit = 1800
     # argv[2] indicates the solution method. If 1, then use benders. Otherwise, use the complete model
     if (len(argv) >= 3 and int(argv[2]) == 1):
         x_vars_dict, z_vars_dict, sol_dict = run_benders_model(
