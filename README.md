@@ -29,4 +29,5 @@ Garanta que a variável *time_limit*, declarada na função *run* do arquivo [ma
 ## Autores
 
 [Arthur H. S. Cruz](https://github.com/thuzax/) ([ver currículo Lattes](http://lattes.cnpq.br/7792617711548023))
+
 Walison Adrian de Oliveira([ver currículo Lattes](http://lattes.cnpq.br/5950090124404335))
